@@ -16,6 +16,7 @@ class EfficientLanderEnv(gym.Wrapper):
     6. Rewards vertical alignment with the center objective
     7. Provides continuous positive feedback for good behavior
     8. Balances exploration vs exploitation for consistent performance
+    9. ENDS EPISODE IMMEDIATELY when touching ground (consistent behavior)
     """
 
     def __init__(self, env):
@@ -44,10 +45,14 @@ class EfficientLanderEnv(gym.Wrapper):
         self.has_landed = False
         self.landing_position = None
         self.movement_after_landing = 0
+        
+        # Episode control
+        self.episode_terminated = False
+        self.episode_truncated = False
 
     def step(self, action, **kwargs):
         """
-        Override the step method to implement precision-focused reward logic.
+        Override the step method to implement precision-focused reward logic with controlled episode termination.
 
         Args:
             action: The action taken by the agent
@@ -55,6 +60,10 @@ class EfficientLanderEnv(gym.Wrapper):
         Returns:
             observation, reward, terminated, truncated, info
         """
+        # If we've already terminated, return the final state
+        if self.episode_terminated or self.episode_truncated:
+            return self.last_obs, 0.0, True, False, self.last_info
+        
         # Increment episode steps
         self.episode_steps += 1
         
@@ -64,7 +73,11 @@ class EfficientLanderEnv(gym.Wrapper):
         
         # Take the original step
         obs, reward, terminated, truncated, info = self.env.step(action)
-
+        
+        # Store for potential reuse
+        self.last_obs = obs
+        self.last_info = info
+        
         # Start with the original reward
         modified_reward = reward
 
@@ -84,8 +97,19 @@ class EfficientLanderEnv(gym.Wrapper):
         landing_encouragement = self._calculate_landing_encouragement(obs)
         modified_reward += landing_encouragement
 
-        # Apply landing bonus if episode is terminated successfully
-        if terminated and info.get("success", False):
+        # CRITICAL: Check if we've touched the ground and should end episode
+        x_pos, y_pos = obs[0], obs[1]
+        left_leg, right_leg = obs[6], obs[7]
+        
+        # Check if we've touched the ground (either through position or leg contact)
+        # More strict ground detection to ensure episode ends
+        touched_ground = (y_pos <= 0.05) or (left_leg and right_leg and y_pos <= 0.08)
+        
+        if touched_ground and not self.episode_terminated:
+            # We've touched the ground - end the episode immediately
+            self.episode_terminated = True
+            
+            # Calculate final landing bonus
             landing_bonus = self._calculate_landing_bonus(obs)
             modified_reward += landing_bonus
             
@@ -94,11 +118,44 @@ class EfficientLanderEnv(gym.Wrapper):
                 modified_reward += 100.0
             elif self.total_fuel_used < 150:  # Moderately fuel efficient
                 modified_reward += 50.0
-
-        # Add penalty for crashes
-        if terminated and not info.get("success", False):
-            modified_reward -= 50.0  # Moderate penalty for crashes
-
+            
+            # Determine if it's a successful landing (in landing zone)
+            in_landing_zone = (abs(x_pos) < 0.3 and y_pos < 0.5)
+            if in_landing_zone:
+                info['success'] = True
+                info['landing_type'] = 'successful'
+            else:
+                info['success'] = False
+                info['landing_type'] = 'outside_zone'
+            
+            # Add penalty for crashes (if not in landing zone)
+            if not in_landing_zone:
+                modified_reward -= 50.0  # Moderate penalty for landing outside
+            
+            # Force episode termination
+            self.episode_terminated = True
+            return obs, modified_reward, True, False, info
+        
+        # If episode was terminated by the original environment, handle it
+        if terminated:
+            # This means the original environment ended the episode
+            # Apply landing bonus if it was successful
+            if info.get('success', False):
+                landing_bonus = self._calculate_landing_bonus(obs)
+                modified_reward += landing_bonus
+                
+                # Additional bonus for fuel efficiency
+                if self.total_fuel_used < 80:
+                    modified_reward += 100.0
+                elif self.total_fuel_used < 150:
+                    modified_reward += 50.0
+            else:
+                # Crashed or other failure
+                modified_reward -= 50.0
+            
+            # Mark as terminated to prevent further steps
+            self.episode_terminated = True
+        
         # Add very mild time pressure
         if self.episode_steps > 800:
             modified_reward -= 0.05 * (self.episode_steps - 800)
@@ -309,6 +366,10 @@ class EfficientLanderEnv(gym.Wrapper):
         self.has_landed = False
         self.landing_position = None
         self.movement_after_landing = 0
+        self.episode_terminated = False
+        self.episode_truncated = False
+        self.last_obs = None
+        self.last_info = None
         return self.env.reset(**kwargs)
 
     def render(self, mode="human"):
