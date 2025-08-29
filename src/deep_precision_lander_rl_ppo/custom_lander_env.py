@@ -372,26 +372,51 @@ class EfficientLanderEnv(gym.Wrapper):
         self.last_info = None
         return self.env.reset(**kwargs)
 
-    def render(self, mode="human"):
+    def render(self, mode="human", **kwargs):
         """Render the environment with custom UI overlay."""
         # Get the original render
-        render_result = self.env.render(mode)
+        render_result = self.env.render(mode, **kwargs)
         
-        # Add custom UI overlay if we have a surface to draw on
-        if mode == "human" and hasattr(self.env, 'viewer') and self.env.viewer is not None:
+        # For Box2D environments, try to add UI overlay
+        if mode == "human" and render_result is not None:
             try:
-                # Try to get the pygame surface from the viewer
-                if hasattr(self.env.viewer, 'window'):
-                    surface = self.env.viewer.window
-                    self._draw_ui_overlay(surface)
-                elif hasattr(self.env.viewer, 'surf'):
-                    surface = self.env.viewer.surf
-                    self._draw_ui_overlay(surface)
+                # Check if render_result is a pygame surface
+                if hasattr(render_result, 'blit') and hasattr(render_result, 'get_width') and hasattr(render_result, 'get_height'):
+                    # Great! The render result is the pygame surface
+                    self._draw_ui_overlay(render_result)
+                else:
+                    # Try to find pygame surface in environment attributes
+                    self._try_find_pygame_surface()
             except Exception as e:
                 # If UI overlay fails, just continue with normal rendering
                 pass
         
         return render_result
+    
+    def _try_find_pygame_surface(self):
+        """Try to find pygame surface in various places."""
+        try:
+            # Check if the environment has a pygame surface attribute
+            if hasattr(self.env, 'screen'):
+                self._draw_ui_overlay(self.env.screen)
+            elif hasattr(self.env, 'window'):
+                self._draw_ui_overlay(self.env.window)
+            elif hasattr(self.env, 'surf'):
+                self._draw_ui_overlay(self.env.surf)
+            else:
+                # Try to find it in the environment's attributes
+                for attr_name in dir(self.env):
+                    if not attr_name.startswith('_'):
+                        try:
+                            attr = getattr(self.env, attr_name)
+                            if hasattr(attr, 'blit') and hasattr(attr, 'get_width') and hasattr(attr, 'get_height'):
+                                # Found a pygame surface!
+                                self._draw_ui_overlay(attr)
+                                break
+                        except:
+                            continue
+        except Exception as e:
+            pass
     
     def _draw_ui_overlay(self, surface):
         """Draw custom UI overlay on the pygame surface."""
@@ -413,84 +438,100 @@ class EfficientLanderEnv(gym.Wrapper):
             distance_from_center = abs(x_pos)
             total_speed = np.sqrt(x_vel**2 + y_vel**2)
             
-            # Font setup
-            font_size = 16
+            # Font setup - use larger font for better visibility
+            font_size = 20
             try:
                 font = pygame.font.Font(None, font_size)
             except:
-                font = pygame.font.Font(None, 24)  # Fallback font size
+                font = pygame.font.Font(None, 28)  # Fallback font size
             
-            # Colors
+            # Colors - make them more vibrant
             white = (255, 255, 255)
             green = (0, 255, 0)
             yellow = (255, 255, 0)
             red = (255, 0, 0)
-            blue = (0, 100, 255)
+            blue = (0, 150, 255)
             black = (0, 0, 0)
+            dark_gray = (40, 40, 40)
             
-            # UI Elements
+            # UI Elements with better positioning and visibility
             ui_elements = []
             
-            # 1. Fuel Gauge (top left)
+            # 1. Fuel Gauge (top left) - with background for better visibility
             fuel_color = green if remaining_fuel > 700 else yellow if remaining_fuel > 300 else red
-            fuel_text = f"Fuel: {remaining_fuel}/1000"
-            fuel_surface = font.render(fuel_text, True, fuel_color, black)
-            ui_elements.append((fuel_surface, (10, 10)))
+            fuel_text = f"FUEL: {remaining_fuel}/1000"
+            fuel_surface = font.render(fuel_text, True, fuel_color, dark_gray)
+            fuel_rect = fuel_surface.get_rect()
+            fuel_rect.topleft = (15, 15)
+            ui_elements.append((fuel_surface, fuel_rect))
             
-            # 2. Speed Indicator (top right)
+            # 2. Speed Indicator (top right) - with background
             speed_color = green if total_speed < 0.5 else yellow if total_speed < 1.0 else red
-            speed_text = f"Speed: {total_speed:.2f}"
-            speed_surface = font.render(speed_text, True, speed_color, black)
+            speed_text = f"SPEED: {total_speed:.2f}"
+            speed_surface = font.render(speed_text, True, speed_color, dark_gray)
             speed_rect = speed_surface.get_rect()
-            speed_rect.topright = (surface.get_width() - 10, 10)
+            speed_rect.topright = (surface.get_width() - 15, 15)
             ui_elements.append((speed_surface, speed_rect))
             
-            # 3. Landing Precision (center top)
+            # 3. Landing Precision (center top) - most important info
             if y_pos > 0.5:
-                precision_text = f"Distance: {distance_from_center:.3f}"
+                precision_text = f"DISTANCE: {distance_from_center:.3f}"
                 precision_color = green if distance_from_center < 0.1 else yellow if distance_from_center < 0.2 else red
             else:
                 if distance_from_center < 0.05:
-                    precision_text = "PERFECT LANDING!"
+                    precision_text = "🎯 PERFECT LANDING!"
                     precision_color = green
                 elif distance_from_center < 0.1:
-                    precision_text = "Excellent Landing"
+                    precision_text = "✅ EXCELLENT"
                     precision_color = green
                 elif distance_from_center < 0.2:
-                    precision_text = "Good Landing"
+                    precision_text = "⚠️  GOOD"
                     precision_color = yellow
                 elif distance_from_center < 0.3:
-                    precision_text = "Poor Landing"
+                    precision_text = "❌ POOR"
                     precision_color = red
                 else:
-                    precision_text = "Outside Zone!"
+                    precision_text = "💥 OUTSIDE ZONE!"
                     precision_color = red
             
-            precision_surface = font.render(precision_text, True, precision_color, black)
+            precision_surface = font.render(precision_text, True, precision_color, dark_gray)
             precision_rect = precision_surface.get_rect()
             precision_rect.centerx = surface.get_width() // 2
-            precision_rect.y = 10
+            precision_rect.y = 15
             ui_elements.append((precision_surface, precision_rect))
             
-            # 4. Position Info (bottom left)
-            pos_text = f"Pos: ({x_pos:.2f}, {y_pos:.2f})"
-            pos_surface = font.render(pos_text, True, blue, black)
-            ui_elements.append((pos_surface, (10, surface.get_height() - 30)))
+            # 4. Position Info (bottom left) - with background
+            pos_text = f"POS: ({x_pos:.2f}, {y_pos:.2f})"
+            pos_surface = font.render(pos_text, True, blue, dark_gray)
+            pos_rect = pos_surface.get_rect()
+            pos_rect.bottomleft = (15, surface.get_height() - 15)
+            ui_elements.append((pos_surface, pos_rect))
             
-            # 5. Episode Info (bottom right)
-            episode_text = f"Steps: {self.episode_steps}"
-            episode_surface = font.render(episode_text, True, white, black)
+            # 5. Episode Info (bottom right) - with background
+            episode_text = f"STEPS: {self.episode_steps}"
+            episode_surface = font.render(episode_text, True, white, dark_gray)
             episode_rect = episode_surface.get_rect()
-            episode_rect.bottomright = (surface.get_width() - 10, surface.get_height() - 10)
+            episode_rect.bottomright = (surface.get_width() - 15, surface.get_height() - 15)
             ui_elements.append((episode_surface, episode_rect))
             
-            # Draw all UI elements
+            # Draw all UI elements with backgrounds for better visibility
             for element_surface, position in ui_elements:
                 if isinstance(position, pygame.Rect):
+                    # Draw background rectangle for better visibility
+                    bg_rect = position.inflate(10, 5)
+                    pygame.draw.rect(surface, dark_gray, bg_rect)
+                    pygame.draw.rect(surface, white, bg_rect, 2)  # White border
+                    # Draw the text
                     surface.blit(element_surface, position)
                 else:
+                    # For tuple positions, draw background circle
+                    bg_rect = pygame.Rect(position[0]-5, position[1]-5, element_surface.get_width()+10, element_surface.get_height()+10)
+                    pygame.draw.rect(surface, dark_gray, bg_rect)
+                    pygame.draw.rect(surface, white, bg_rect, 2)  # White border
+                    # Draw the text
                     surface.blit(element_surface, position)
                     
         except Exception as e:
             # If anything goes wrong with UI rendering, just continue
+            print(f"UI drawing failed: {e}")
             pass
