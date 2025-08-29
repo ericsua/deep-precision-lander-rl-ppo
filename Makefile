@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test test-cov format format-check sort sort-check lint type-check clean train train-enhanced train-optimized train-landing-focused train-extended analyze evaluate example
+.PHONY: help install install-dev test test-cov format format-check sort sort-check lint type-check clean train train-enhanced train-optimized train-landing-focused train-extended analyze train-precision evaluate example
 
 help:  ## Show this help message
 	@echo "Available commands:"
@@ -61,6 +61,9 @@ train-extended:  ## Run the extended training script with fine-tuned reward func
 
 analyze:  ## Analyze the trained agent's behavior and performance
 	uv run python scripts/analyze_agent.py
+
+train-precision:  ## Run precision-focused training for center landing and movement prevention
+	uv run python scripts/train_precision.py
 
 evaluate:  ## Run the evaluation script
 	uv run python scripts/evaluate.py
