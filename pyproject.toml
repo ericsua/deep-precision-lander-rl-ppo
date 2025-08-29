@@ -1,0 +1,150 @@
+[project]
+name = "deep-precision-lander-rl-ppo"
+version = "0.1.0"
+description = "Reinforcement Learning project for fuel-efficient and precise Lunar Lander using PPO"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Hackathon Team", email = "team@company.com"}
+]
+maintainers = [
+    {name = "Hackathon Team", email = "team@company.com"}
+]
+keywords = ["reinforcement-learning", "lunar-lander", "ppo", "gymnasium", "stable-baselines3"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "gymnasium[box2d]>=0.31.0",
+    "torch>=2.2.0",
+    "stable-baselines3[extra]>=2.3.0",
+    "tensorboard>=2.15.0",
+    "numpy>=1.24.0",
+    "matplotlib>=3.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+train-lander = "deep_precision_lander_rl_ppo.train:main"
+evaluate-lander = "deep_precision_lander_rl_ppo.evaluate:main"
+example-lander = "deep_precision_lander_rl_ppo.example:main"
+
+[project.urls]
+Homepage = "https://github.com/your-username/deep-precision-lander-rl-ppo"
+Documentation = "https://github.com/your-username/deep-precision-lander-rl-ppo#readme"
+Repository = "https://github.com/your-username/deep-precision-lander-rl-ppo.git"
+Issues = "https://github.com/your-username/deep-precision-lander-rl-ppo/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deep_precision_lander_rl_ppo"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/scripts",
+    "/README.md",
+    "/LICENSE",
+]
+
+[tool.hatch.envs.default]
+dependencies = [
+    "pytest",
+    "pytest-cov",
+    "black",
+    "isort",
+    "flake8",
+    "mypy",
+]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "pytest --cov=src/deep_precision_lander_rl_ppo {args:tests}"
+format = "black {args:src tests scripts}"
+format-check = "black --check {args:src tests scripts}"
+sort = "isort {args:src tests scripts}"
+sort-check = "isort --check-only {args:src tests scripts}"
+lint = "flake8 {args:src tests scripts}"
+type-check = "mypy {args:src/deep_precision_lander_rl_ppo}"
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["deep_precision_lander_rl_ppo"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=src/deep_precision_lander_rl_ppo",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
