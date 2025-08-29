@@ -373,5 +373,124 @@ class EfficientLanderEnv(gym.Wrapper):
         return self.env.reset(**kwargs)
 
     def render(self, mode="human"):
-        """Render the environment."""
-        return self.env.render(mode)
+        """Render the environment with custom UI overlay."""
+        # Get the original render
+        render_result = self.env.render(mode)
+        
+        # Add custom UI overlay if we have a surface to draw on
+        if mode == "human" and hasattr(self.env, 'viewer') and self.env.viewer is not None:
+            try:
+                # Try to get the pygame surface from the viewer
+                if hasattr(self.env.viewer, 'window'):
+                    surface = self.env.viewer.window
+                    self._draw_ui_overlay(surface)
+                elif hasattr(self.env.viewer, 'surf'):
+                    surface = self.env.viewer.surf
+                    self._draw_ui_overlay(surface)
+            except Exception as e:
+                # If UI overlay fails, just continue with normal rendering
+                pass
+        
+        return render_result
+    
+    def _draw_ui_overlay(self, surface):
+        """Draw custom UI overlay on the pygame surface."""
+        try:
+            import pygame
+            
+            # Get current observation for UI data
+            if hasattr(self, 'last_obs') and self.last_obs is not None:
+                obs = self.last_obs
+            else:
+                return
+            
+            # Extract observation components
+            x_pos, y_pos = obs[0], obs[1]
+            x_vel, y_vel = obs[2], obs[3]
+            
+            # Calculate UI metrics
+            remaining_fuel = 1000 - self.total_fuel_used
+            distance_from_center = abs(x_pos)
+            total_speed = np.sqrt(x_vel**2 + y_vel**2)
+            
+            # Font setup
+            font_size = 16
+            try:
+                font = pygame.font.Font(None, font_size)
+            except:
+                font = pygame.font.Font(None, 24)  # Fallback font size
+            
+            # Colors
+            white = (255, 255, 255)
+            green = (0, 255, 0)
+            yellow = (255, 255, 0)
+            red = (255, 0, 0)
+            blue = (0, 100, 255)
+            black = (0, 0, 0)
+            
+            # UI Elements
+            ui_elements = []
+            
+            # 1. Fuel Gauge (top left)
+            fuel_color = green if remaining_fuel > 700 else yellow if remaining_fuel > 300 else red
+            fuel_text = f"Fuel: {remaining_fuel}/1000"
+            fuel_surface = font.render(fuel_text, True, fuel_color, black)
+            ui_elements.append((fuel_surface, (10, 10)))
+            
+            # 2. Speed Indicator (top right)
+            speed_color = green if total_speed < 0.5 else yellow if total_speed < 1.0 else red
+            speed_text = f"Speed: {total_speed:.2f}"
+            speed_surface = font.render(speed_text, True, speed_color, black)
+            speed_rect = speed_surface.get_rect()
+            speed_rect.topright = (surface.get_width() - 10, 10)
+            ui_elements.append((speed_surface, speed_rect))
+            
+            # 3. Landing Precision (center top)
+            if y_pos > 0.5:
+                precision_text = f"Distance: {distance_from_center:.3f}"
+                precision_color = green if distance_from_center < 0.1 else yellow if distance_from_center < 0.2 else red
+            else:
+                if distance_from_center < 0.05:
+                    precision_text = "PERFECT LANDING!"
+                    precision_color = green
+                elif distance_from_center < 0.1:
+                    precision_text = "Excellent Landing"
+                    precision_color = green
+                elif distance_from_center < 0.2:
+                    precision_text = "Good Landing"
+                    precision_color = yellow
+                elif distance_from_center < 0.3:
+                    precision_text = "Poor Landing"
+                    precision_color = red
+                else:
+                    precision_text = "Outside Zone!"
+                    precision_color = red
+            
+            precision_surface = font.render(precision_text, True, precision_color, black)
+            precision_rect = precision_surface.get_rect()
+            precision_rect.centerx = surface.get_width() // 2
+            precision_rect.y = 10
+            ui_elements.append((precision_surface, precision_rect))
+            
+            # 4. Position Info (bottom left)
+            pos_text = f"Pos: ({x_pos:.2f}, {y_pos:.2f})"
+            pos_surface = font.render(pos_text, True, blue, black)
+            ui_elements.append((pos_surface, (10, surface.get_height() - 30)))
+            
+            # 5. Episode Info (bottom right)
+            episode_text = f"Steps: {self.episode_steps}"
+            episode_surface = font.render(episode_text, True, white, black)
+            episode_rect = episode_surface.get_rect()
+            episode_rect.bottomright = (surface.get_width() - 10, surface.get_height() - 10)
+            ui_elements.append((episode_surface, episode_rect))
+            
+            # Draw all UI elements
+            for element_surface, position in ui_elements:
+                if isinstance(position, pygame.Rect):
+                    surface.blit(element_surface, position)
+                else:
+                    surface.blit(element_surface, position)
+                    
+        except Exception as e:
+            # If anything goes wrong with UI rendering, just continue
+            pass
