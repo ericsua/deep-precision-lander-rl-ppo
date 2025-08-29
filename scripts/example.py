@@ -27,7 +27,8 @@ def main():
     print(f"Environment created successfully!")
     print(f"Action space: {env.action_space}")
     print(f"Observation space: {env.observation_space}")
-    print(f"Fuel consumption penalty: {env.fuel_consumption_penalty}x")
+    print(f"Fuel efficiency bonus: {env.fuel_efficiency_bonus}")
+    print(f"Landing bonus: {env.landing_bonus}")
 
     # Run a few episodes with random actions
     num_episodes = 3
@@ -69,10 +70,11 @@ def main():
     env.close()
 
     print("\n" + "=" * 50)
-    print("Example completed! The custom reward function:")
-    print("• Applies 2.5x penalty for fuel consumption")
-    print("• Rewards precision landing near the center")
-    print("• Encourages efficient and precise behavior")
+    print("Example completed! The new balanced reward function:")
+    print("• Provides continuous positive feedback for progress")
+    print("• Rewards fuel efficiency with bonuses (not penalties)")
+    print("• Gives substantial landing bonuses (200+ points)")
+    print("• Encourages safe and precise landings")
 
 
 if __name__ == "__main__":

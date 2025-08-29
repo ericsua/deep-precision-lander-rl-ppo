@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test test-cov format format-check sort sort-check lint type-check clean train evaluate example
+.PHONY: help install install-dev test test-cov format format-check sort sort-check lint type-check clean train train-enhanced train-optimized train-landing-focused train-extended analyze evaluate example
 
 help:  ## Show this help message
 	@echo "Available commands:"
@@ -46,6 +46,21 @@ clean:  ## Clean up build artifacts and cache
 
 train:  ## Run the training script
 	uv run python scripts/train.py
+
+train-enhanced:  ## Run the enhanced training script with better parameters
+	uv run python scripts/train_enhanced.py
+
+train-optimized:  ## Run the optimized training script with new reward function
+	uv run python scripts/train_optimized.py
+
+train-landing-focused:  ## Run the landing-focused training script to fix hovering issue
+	uv run python scripts/train_landing_focused.py
+
+train-extended:  ## Run the extended training script with fine-tuned reward function
+	uv run python scripts/train_extended.py
+
+analyze:  ## Analyze the trained agent's behavior and performance
+	uv run python scripts/analyze_agent.py
 
 evaluate:  ## Run the evaluation script
 	uv run python scripts/evaluate.py
